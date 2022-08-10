@@ -45,11 +45,11 @@ def create_rdr_records():
                 "authors": record["authors"],
                 "custom_fields": {
                     "Data Sensitivity": record["custom_fields"]["Data Sensitivity"],
-                    # "Data Sensitivity": record["custom_fields"]["Q/A Log"],
+                    "Source": record["custom_fields"]["Source"],
                 },
                 "defined_type": "dataset",
-                "license": 2,
-                "funding": record["funding"],
+                "license": record["license"],
+                "funding_list": record["funding_list"],
                 "references": record["references"],
                 "timeline": record["timeline"],
                 "group_id": record["group_id"],
@@ -76,14 +76,19 @@ def create_rdr_records():
                 # Create a linked file to the doi record
                 url = f"{base_url}/account/articles/{article_id}/files"
 
-                payload = {"link": record["doi"]}
+                doi_url = f"https://doi.org/{record['doi']}"
+
+                payload = {}
+                payload["link"] = doi_url
 
                 headers = {
                     "Authorization": f"token {token}",
                     "Content-Type": "text/plain",
                 }
 
-                response = requests.request("POST", url, headers=headers, data=payload)
+                response = requests.request(
+                    "POST", url, headers=headers, data=json.dumps(payload)
+                )
 
                 print(response.text)
 

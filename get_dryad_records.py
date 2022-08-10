@@ -107,19 +107,22 @@ def handle_funders(funders):
     """
     Returns a structured list of funders
     """
-    funder_list = ""
+    funding_list = []
     for dryad_funder in funders:
         if "awardNumber" not in dryad_funder or dryad_funder["awardNumber"] == "":
-            funder = f"{dryad_funder['organization']}, "
+            funder = {}
+            funder["title"] = dryad_funder["organization"]
         else:
-            funder = f"{dryad_funder['organization']} : {dryad_funder['awardNumber']}, "
+            funder = {}
+            funder["title"] = (
+                dryad_funder["organization"] + " : " + dryad_funder["awardNumber"]
+            )
 
-        funder_list += funder
+        funding_list.append(funder)
 
-    if funder_list.endswith(", "):
-        return funder_list[:-2]
-    else:
-        return funder_list
+    funding_list_uniques = [dict(t) for t in {tuple(d.items()) for d in funding_list}]
+
+    return funding_list_uniques
 
 
 def handle_references(references):
@@ -130,8 +133,12 @@ def handle_references(references):
     for reference in references:
         if (
             "identifier" in reference
-            and reference["identifierType"] == "URL"
+            and (
+                reference["identifierType"] == "URL"
+                or reference["identifierType"] == "DOI"
+            )
             and reference["identifier"] != ""
+            and reference["identifier"].startswith("http")
         ):
             reference_list.append(reference["identifier"])
 
@@ -140,7 +147,7 @@ def handle_references(references):
 
 def handle_doi(doi):
     """
-    Returns a web url doi format
+    Returns doi format
     """
 
     # return doi
@@ -194,27 +201,47 @@ def get_dryad_records():
 
                 # Handle methods if present
                 if "methods" in dryad_record:
-                    record["description"] += "\n\n " + re.sub(
-                        cleaned_text, "", dryad_record["methods"]
+                    record["description"] += (
+                        "\n\n"
+                        + "<h3>Methods</h3>\n"
+                        + re.sub(cleaned_text, "", dryad_record["methods"])
                     )
 
                 # Handle usage notes if present
                 if "usageNotes" in dryad_record:
-                    record["description"] += "\n\n " + re.sub(
-                        cleaned_text, "", dryad_record["usageNotes"]
+                    record["description"] += (
+                        "\n\n"
+                        + "<h3>Usage Notes</h3>\n"
+                        + re.sub(cleaned_text, "", dryad_record["usageNotes"])
+                    )
+
+                # Ensure that the generated dsescription text is less than 10000 chars
+                if len(record["description"]) >= 10000:
+                    record["description"] = (
+                        record["description"][:9950]
+                        + "....see Dryad link for full text"
                     )
 
                 # Handle funders
                 if "funders" in dryad_record:
-                    record["funding"] = handle_funders(dryad_record["funders"])
+                    record["funding_list"] = handle_funders(dryad_record["funders"])
                 else:
-                    record["funding"] = ""
+                    record["funding_list"] = []
 
-                # Handle keywords if present
-                if "keywords" not in dryad_record or dryad_record["keywords"] == "":
-                    record["keywords"] = ["None Given"]
+                # Handle keywords (and fieldOfScience codes) if present
+                keywords = []
+                if "keywords" in dryad_record and dryad_record["keywords"] != "":
+                    keywords = dryad_record["keywords"]
+                if (
+                    "fieldOfScience" in dryad_record
+                    and dryad_record["fieldOfScience"] != ""
+                ):
+                    keywords.append(dryad_record["fieldOfScience"])
+
+                if keywords:
+                    record["keywords"] = list(set(keywords))
                 else:
-                    record["keywords"] = dryad_record["keywords"]
+                    record["keywords"] = ["None Given"]
 
                 # Handle publication date
                 timelines = {}
@@ -223,28 +250,28 @@ def get_dryad_records():
                 timelines["publisherAcceptance"] = dryad_record["publicationDate"]
                 record["timeline"] = timelines
 
-                # record["dryad_id"] = dryad_record["id"]
-                # record["visibility"] = dryad_record["visibility"]
-
                 # Insert license
                 record["license"] = 2
 
                 # Insert group id
-                #
+                # Staging
                 # record["group_id"] = 42314
+                # Prod
                 record["group_id"] = 39389
 
                 # Insert defined type
                 record["defined_type"] = "Dataset"
 
                 # Insert category
-                # record["categories"] = [2]
+                # Staging
+                # record["categories"] = [1012]
+                # Prod
                 record["categories"] = [26209]
 
-                # Insert cuctom fields
+                # Insert custom fields
                 record["custom_fields"] = {
                     "Data Sensitivity": ["General"],
-                    "Q/A Log": ["Peer review completed"],
+                    "Source": "Dryad",
                 }
 
                 data.append(record)
