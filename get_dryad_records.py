@@ -15,8 +15,16 @@ import re
 import config
 
 
-token = config.TOKEN
-base_url = config.BASE_URL
+# SETTINGS
+BASE_URL = "https://api.figsh.com/v2"  # Staging instance
+ROR = "01sf06y89"  # from https://ror.org
+LICENSE_ID = 2  # ID of the relevant license in the figshare instance
+GROUP_ID = 39389  # Figshare data group
+CATEGORIES = [26209]  # List of categories under which to upload dataset
+ADD_CUSTOM = True  # Boolean for whether to add custom metadata fields
+
+# API Token should be retrieved from a seperate config file (config.py)
+TOKEN = config.TOKEN
 
 
 def generate_search_url(page_num, per_page):
@@ -24,7 +32,7 @@ def generate_search_url(page_num, per_page):
     Generate a URL string for Dryad search endpoint using page number and per_page
     """
 
-    return f"https://datadryad.org/api/v2/search?affiliation=https%3A%2F%2Fror.org%2F01sf06y89&page={page_num}&per_page={per_page}"
+    return f"https://datadryad.org/api/v2/search?affiliation=https%3A%2F%2Fror.org%2F{ROR}&page={page_num}&per_page={per_page}"
 
 
 def validate_record(dryad_record):
@@ -54,9 +62,9 @@ def get_rdr_userid(email):
     """
     Return an RDR user ID (if one exists) given an mq email address
     """
-    url = f"{base_url}/account/institution/accounts?email={email}"
+    url = f"{BASE_URL}/account/institution/accounts?email={email}"
 
-    headers = {"Authorization": f"token {token}"}
+    headers = {"Authorization": f"token {TOKEN}"}
 
     response = requests.request("GET", url, headers=headers)
 
@@ -123,6 +131,38 @@ def handle_funders(funders):
     funding_list_uniques = [dict(t) for t in {tuple(d.items()) for d in funding_list}]
 
     return funding_list_uniques
+
+
+def handle_description(dryad_record):
+    """
+    Pulls together dryad abstract, methods and usage text into figshare description field
+    """
+
+    # Handle abstract - strip out HTML tags
+    cleaned_text = re.compile("<.*?>")
+    description = re.sub(cleaned_text, "", dryad_record["abstract"])
+
+    # Handle methods if present
+    if "methods" in dryad_record:
+        description += (
+            "\n\n"
+            + "<h3>Methods</h3>\n"
+            + re.sub(cleaned_text, "", dryad_record["methods"])
+        )
+
+    # Handle usage notes if present
+    if "usageNotes" in dryad_record:
+        description += (
+            "\n\n"
+            + "<h3>Usage Notes</h3>\n"
+            + re.sub(cleaned_text, "", dryad_record["usageNotes"])
+        )
+
+    # Ensure that the generated description text is less than 10000 chars
+    if len(description) >= 10000:
+        description = description[:9950] + "....see Dryad link for full text"
+
+    return description
 
 
 def handle_references(references):
@@ -193,34 +233,8 @@ def get_dryad_records():
                 else:
                     record["references"] = []
 
-                # Handle abstract - strip out HTML tags
-                cleaned_text = re.compile("<.*?>")
-                record["description"] = re.sub(
-                    cleaned_text, "", dryad_record["abstract"]
-                )
-
-                # Handle methods if present
-                if "methods" in dryad_record:
-                    record["description"] += (
-                        "\n\n"
-                        + "<h3>Methods</h3>\n"
-                        + re.sub(cleaned_text, "", dryad_record["methods"])
-                    )
-
-                # Handle usage notes if present
-                if "usageNotes" in dryad_record:
-                    record["description"] += (
-                        "\n\n"
-                        + "<h3>Usage Notes</h3>\n"
-                        + re.sub(cleaned_text, "", dryad_record["usageNotes"])
-                    )
-
-                # Ensure that the generated dsescription text is less than 10000 chars
-                if len(record["description"]) >= 10000:
-                    record["description"] = (
-                        record["description"][:9950]
-                        + "....see Dryad link for full text"
-                    )
+                # Handle description
+                record["description"] = handle_description(dryad_record)
 
                 # Handle funders
                 if "funders" in dryad_record:
@@ -243,36 +257,31 @@ def get_dryad_records():
                 else:
                     record["keywords"] = ["None Given"]
 
-                # Handle publication date
+                # Handle associated dates
                 timelines = {}
                 timelines["firstOnline"] = dryad_record["publicationDate"]
                 timelines["publisherPublication"] = dryad_record["publicationDate"]
                 timelines["publisherAcceptance"] = dryad_record["publicationDate"]
                 record["timeline"] = timelines
 
-                # Insert license
-                record["license"] = 2
+                # Insert license matching CC-BY
+                record["license"] = LICENSE_ID
 
-                # Insert group id
-                # Staging
-                # record["group_id"] = 42314
-                # Prod
-                record["group_id"] = 39389
+                # Insert RDR/figshare group id
+                record["group_id"] = GROUP_ID
 
                 # Insert defined type
                 record["defined_type"] = "Dataset"
 
                 # Insert category
-                # Staging
-                # record["categories"] = [1012]
-                # Prod
-                record["categories"] = [26209]
+                record["categories"] = CATEGORIES
 
                 # Insert custom fields
-                record["custom_fields"] = {
-                    "Data Sensitivity": ["General"],
-                    "Source": "Dryad",
-                }
+                if ADD_CUSTOM:
+                    record["custom_fields"] = {
+                        "Data Sensitivity": ["General"],
+                        "Source": "Dryad",
+                    }
 
                 data.append(record)
 
