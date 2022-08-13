@@ -34,7 +34,7 @@ You will need to run two scripts sequentially:
 Settings are applied at the top of get_dryad_records.py and allow you to set:
 
 - BASE_URL - Base figshare URL (staging or production etc), e.g. "https://api.figsh.com/v2" for Staging instance
-- ROR - "01sf06y89" Set the Research organisation ID (from https://ror.org)
+- ROR - Set the Research organisation ID (from https://ror.org)
 - LICENSE_ID - ID of the relevant license in the figshare instance
 - GROUP_ID - Figshare data group
 - CATEGORIES - List of category IDs under which to upload dataset
