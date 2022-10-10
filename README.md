@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7183386.svg)](https://doi.org/10.5281/zenodo.7183386)
+
 # Dryad to Figshare harvest
 
 Python 3 script to harvest metadata from a selected organisation's Dryad data records and generate matching metadata-only records in an institutional Figshare repository.
