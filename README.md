@@ -2,7 +2,7 @@
 
 # Dryad to Figshare harvest
 
-Python 3 script to harvest metadata from a selected organisation's Dryad data records and generate matching metadata-only records in an institutional Figshare repository.
+Python script to harvest metadata from a selected organisation's Dryad data records and generate matching metadata-only records in an institutional Figshare repository.
 
 ## Notes
 
